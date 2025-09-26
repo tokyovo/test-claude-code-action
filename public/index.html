@@ -144,7 +144,9 @@
             }
 
             todoList.innerHTML = filteredTodos.map(todo => `
-                <li class="todo-item ${todo.completed ? 'completed' : ''}">
+                <li class="todo-item ${todo.completed ? 'completed' : ''}"
+                    tabindex="0"
+                    data-id="${todo.id}">
                     <input type="checkbox"
                            ${todo.completed ? 'checked' : ''}
                            onchange="toggleTodo(${todo.id})" />
@@ -152,6 +154,9 @@
                     <button class="delete-btn" onclick="deleteTodo(${todo.id})">×</button>
                 </li>
             `).join('');
+
+            // Re-attach keyboard event listeners to todo items
+            attachTodoKeyboardListeners();
         }
 
         async function updateStats() {
@@ -167,10 +172,38 @@
             }
         }
 
+        function attachTodoKeyboardListeners() {
+            const todoItems = document.querySelectorAll('.todo-item');
+
+            todoItems.forEach(item => {
+                item.addEventListener('keydown', async (e) => {
+                    const todoId = parseInt(item.getAttribute('data-id'));
+
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                        e.preventDefault();
+                        await deleteTodo(todoId);
+                    } else if (e.key === ' ' || e.key === 'Spacebar') {
+                        e.preventDefault();
+                        await toggleTodo(todoId);
+                    }
+                });
+            });
+        }
+
         document.getElementById('todoInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 addTodo();
             }
+        });
+
+        // Add keyboard shortcut hints
+        document.addEventListener('DOMContentLoaded', () => {
+            const footer = document.querySelector('.footer');
+            const shortcuts = document.createElement('p');
+            shortcuts.innerHTML = '<small>Keyboard shortcuts: Tab to navigate • Space to toggle • Delete to remove</small>';
+            shortcuts.style.marginTop = '10px';
+            shortcuts.style.color = '#666';
+            footer.appendChild(shortcuts);
         });
 
         fetchTodos();
