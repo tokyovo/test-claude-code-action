@@ -82,6 +82,21 @@ app.get('/api/todos/stats', (req, res) => {
   res.json(stats);
 });
 
+app.get('/api/todos/export', (req, res) => {
+  const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, -5);
+  const filename = `todos-export-${timestamp}.json`;
+
+  const exportData = {
+    exportDate: new Date().toISOString(),
+    totalTodos: todos.length,
+    todos: todos
+  };
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.json(exportData);
+});
+
 app.delete('/api/todos', (req, res) => {
   const { completed } = req.query;
 
