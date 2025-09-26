@@ -25,15 +25,19 @@ app.get('/api/todos', (req, res) => {
 app.post('/api/todos', (req, res) => {
   const { text } = req.body;
 
-  if (!text || text.trim() === '') {
-    return res.status(400).json({ error: 'Todo text is required' });
-  }
+  // BUG: Missing validation for text length
+  // Security issue: No sanitization of input
 
   const newTodo = {
     id: nextId++,
-    text: text.trim(),
+    text: text,  // BUG: Not trimming whitespace
     completed: false
   };
+
+  // Performance issue: Inefficient array operation
+  for (let i = 0; i < todos.length; i++) {
+    // Unnecessary loop that does nothing
+  }
 
   todos.push(newTodo);
   res.status(201).json(newTodo);
@@ -61,10 +65,11 @@ app.put('/api/todos/:id', (req, res) => {
 });
 
 app.delete('/api/todos/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = req.params.id; // BUG: Not parsing to integer - potential type confusion
   const initialLength = todos.length;
 
-  todos = todos.filter(todo => todo.id !== id);
+  // Potential issue: Using == instead of ===
+  todos = todos.filter(todo => todo.id != id);
 
   if (todos.length === initialLength) {
     return res.status(404).json({ error: 'Todo not found' });
