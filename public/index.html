@@ -31,11 +31,11 @@
             <button class="clear-btn" onclick="clearCompleted()">Clear Completed</button>
         </div>
 
-        <ul id="todoList" class="todo-list"></ul>
+        <ul id="todoList" class="todo-list" role="list" aria-label="Todo items with keyboard navigation support"></ul>
 
         <div class="footer">
             <p>Try creating PRs and mentioning @claude to test the GitHub Action!</p>
-            <p style="margin-top: 10px; font-size: 12px; color: #999;">Keyboard shortcuts: Tab to navigate • Space to toggle • Delete to remove</p>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">Keyboard shortcuts: Tab to navigate • Enter/Space to toggle • Delete to remove • Esc to unfocus</p>
         </div>
     </div>
 
@@ -103,9 +103,12 @@
 
                 if (response.ok) {
                     await fetchTodos();
+                    return true;
                 }
+                return false;
             } catch (error) {
                 console.error('Error deleting todo:', error);
+                return false;
             }
         }
 
@@ -145,17 +148,19 @@
             }
 
             todoList.innerHTML = filteredTodos.map(todo => `
-                <li class="todo-item ${todo.completed ? 'completed' : ''}" tabindex="0" data-id="${todo.id}">
+                <li class="todo-item ${todo.completed ? 'completed' : ''}"
+                    tabindex="0"
+                    data-id="${todo.id}"
+                    role="listitem"
+                    aria-label="${todo.text} - ${todo.completed ? 'completed' : 'pending'} - Press Enter or Space to toggle, Delete to remove">
                     <input type="checkbox"
                            ${todo.completed ? 'checked' : ''}
-                           onchange="toggleTodo(${todo.id})" />
+                           onchange="toggleTodo(${todo.id})"
+                           tabindex="-1" />
                     <span>${todo.text}</span>
-                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">×</button>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})" tabindex="-1">×</button>
                 </li>
             `).join('');
-
-            // Attach keyboard listeners to todo items
-            attachTodoKeyboardListeners();
         }
 
         async function updateStats() {
@@ -171,21 +176,53 @@
             }
         }
 
-        function attachTodoKeyboardListeners() {
-            document.querySelectorAll('.todo-item').forEach(item => {
-                item.addEventListener('keydown', (e) => {
-                    const todoId = parseInt(item.dataset.id);
+        // Event delegation approach to prevent memory leaks
+        function handleTodoKeydown(e) {
+            const todoItem = e.target.closest('.todo-item');
+            if (!todoItem) return;
 
-                    if (e.key === ' ' || e.key === 'Spacebar') {
-                        e.preventDefault();
-                        toggleTodo(todoId);
-                    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                        e.preventDefault();
-                        deleteTodo(todoId);
-                    }
-                });
-            });
+            const todoId = parseInt(todoItem.dataset.id);
+
+            switch(e.key) {
+                case ' ':
+                case 'Spacebar':
+                case 'Enter':
+                    e.preventDefault();
+                    toggleTodo(todoId);
+                    break;
+                case 'Delete':
+                case 'Backspace':
+                    e.preventDefault();
+                    // Improve focus management - move to next/previous item
+                    const nextItem = todoItem.nextElementSibling || todoItem.previousElementSibling;
+                    deleteTodo(todoId).then(() => {
+                        if (nextItem) {
+                            // Find the corresponding item after re-render
+                            const newItems = document.querySelectorAll('.todo-item');
+                            if (newItems.length > 0) {
+                                const indexToFocus = Math.min(
+                                    Array.from(todoItem.parentNode.children).indexOf(todoItem),
+                                    newItems.length - 1
+                                );
+                                if (newItems[indexToFocus]) {
+                                    newItems[indexToFocus].focus();
+                                }
+                            }
+                        } else {
+                            // No items left, focus on input
+                            document.getElementById('todoInput').focus();
+                        }
+                    });
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    todoItem.blur();
+                    break;
+            }
         }
+
+        // Set up event delegation for keyboard shortcuts (prevents memory leaks)
+        document.getElementById('todoList').addEventListener('keydown', handleTodoKeydown);
 
         document.getElementById('todoInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
