@@ -82,6 +82,41 @@ app.get('/api/todos/stats', (req, res) => {
   res.json(stats);
 });
 
+app.get('/api/todos/export', (req, res) => {
+  try {
+    // Basic validation - ensure todos array exists and is valid
+    if (!Array.isArray(todos)) {
+      return res.status(500).json({ error: 'Invalid todos data structure' });
+    }
+
+    // Create export data with additional metadata
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalTodos: todos.length,
+      completedTodos: todos.filter(todo => todo.completed).length,
+      pendingTodos: todos.filter(todo => !todo.completed).length,
+      todos: todos
+    };
+
+    // Improved filename formatting (cleaner timestamp)
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const filename = `todos-export-${timestamp}.json`;
+
+    // Set proper headers for file download
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache');
+
+    res.json(exportData);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({
+      error: 'Failed to export todos',
+      message: 'An internal error occurred while exporting your todos. Please try again.'
+    });
+  }
+});
+
 app.delete('/api/todos', (req, res) => {
   const { completed } = req.query;
 
