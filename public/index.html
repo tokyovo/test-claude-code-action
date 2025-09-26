@@ -34,7 +34,7 @@
         <ul id="todoList" class="todo-list" role="list" aria-label="Todo items with keyboard navigation support"></ul>
 
         <!-- Help Modal -->
-        <div id="helpModal" class="help-modal" style="display: none;">
+        <div id="helpModal" class="help-modal" style="display: none;" onclick="closeModalOnOverlayClick(event)">
             <div class="help-content">
                 <h3>Keyboard Shortcuts</h3>
                 <ul>
@@ -63,6 +63,13 @@
     <script>
         let todos = [];
         let currentFilter = 'all';
+
+        // Security: HTML escaping function to prevent XSS attacks
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         async function fetchTodos() {
             try {
@@ -173,12 +180,12 @@
                     tabindex="0"
                     data-id="${todo.id}"
                     role="listitem"
-                    aria-label="${todo.text} - ${todo.completed ? 'completed' : 'pending'} - Press Enter or Space to toggle, Delete to remove">
+                    aria-label="${escapeHtml(todo.text)} - ${todo.completed ? 'completed' : 'pending'} - Press Enter or Space to toggle, Delete to remove">
                     <input type="checkbox"
                            ${todo.completed ? 'checked' : ''}
                            onchange="handleToggleChange(${todo.id})"
                            tabindex="-1" />
-                    <span>${todo.text}</span>
+                    <span>${escapeHtml(todo.text)}</span>
                     <button class="delete-btn" onclick="handleDeleteClick(${todo.id})" tabindex="-1">×</button>
                 </li>
             `).join('');
@@ -232,7 +239,6 @@
             try {
                 switch(e.key) {
                     case ' ':
-                    case 'Spacebar':
                         // Only prevent default if not in a scrollable container context
                         if (todoItem.getBoundingClientRect().height < window.innerHeight) {
                             e.preventDefault();
@@ -294,6 +300,13 @@
                 modal.querySelector('button').focus();
             } else {
                 modal.style.display = 'none';
+            }
+        }
+
+        // Close modal when clicking on overlay (not content)
+        function closeModalOnOverlayClick(event) {
+            if (event.target === event.currentTarget) {
+                toggleHelpModal();
             }
         }
 
