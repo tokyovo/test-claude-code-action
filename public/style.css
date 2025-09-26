@@ -156,6 +156,12 @@ h1 {
     background: #e9ecef;
 }
 
+.todo-item:focus {
+    outline: 2px solid #764ba2;
+    outline-offset: 2px;
+    background: #e9ecef;
+}
+
 .todo-item.completed {
     opacity: 0.6;
 }
