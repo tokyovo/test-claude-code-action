@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App - Claude Code Action Test</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Todo List</h1>
+            <p class="subtitle">Test webapp for Claude Code Action</p>
+        </header>
+
+        <div class="stats" id="stats">
+            <span>Total: <strong id="total">0</strong></span>
+            <span>Completed: <strong id="completed">0</strong></span>
+            <span>Pending: <strong id="pending">0</strong></span>
+        </div>
+
+        <div class="input-section">
+            <input type="text" id="todoInput" placeholder="Enter a new todo..." />
+            <button id="addBtn" onclick="addTodo()">Add Todo</button>
+        </div>
+
+        <div class="filter-section">
+            <button class="filter-btn active" onclick="filterTodos('all')">All</button>
+            <button class="filter-btn" onclick="filterTodos('active')">Active</button>
+            <button class="filter-btn" onclick="filterTodos('completed')">Completed</button>
+            <button class="clear-btn" onclick="clearCompleted()">Clear Completed</button>
+        </div>
+
+        <ul id="todoList" class="todo-list"></ul>
+
+        <div class="footer">
+            <p>Try creating PRs and mentioning @claude to test the GitHub Action!</p>
+        </div>
+    </div>
+
+    <script>
+        let todos = [];
+        let currentFilter = 'all';
+
+        async function fetchTodos() {
+            try {
+                const response = await fetch('/api/todos');
+                todos = await response.json();
+                renderTodos();
+                updateStats();
+            } catch (error) {
+                console.error('Error fetching todos:', error);
+            }
+        }
+
+        async function addTodo() {
+            const input = document.getElementById('todoInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            try {
+                const response = await fetch('/api/todos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    await fetchTodos();
+                }
+            } catch (error) {
+                console.error('Error adding todo:', error);
+            }
+        }
+
+        async function toggleTodo(id) {
+            const todo = todos.find(t => t.id === id);
+            if (!todo) return;
+
+            try {
+                const response = await fetch(`/api/todos/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed: !todo.completed })
+                });
+
+                if (response.ok) {
+                    await fetchTodos();
+                }
+            } catch (error) {
+                console.error('Error toggling todo:', error);
+            }
+        }
+
+        async function deleteTodo(id) {
+            try {
+                const response = await fetch(`/api/todos/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await fetchTodos();
+                }
+            } catch (error) {
+                console.error('Error deleting todo:', error);
+            }
+        }
+
+        async function clearCompleted() {
+            try {
+                const response = await fetch('/api/todos?completed=true', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await fetchTodos();
+                }
+            } catch (error) {
+                console.error('Error clearing completed todos:', error);
+            }
+        }
+
+        function filterTodos(filter) {
+            currentFilter = filter;
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            renderTodos();
+        }
+
+        function renderTodos() {
+            const todoList = document.getElementById('todoList');
+            let filteredTodos = todos;
+
+            if (currentFilter === 'active') {
+                filteredTodos = todos.filter(t => !t.completed);
+            } else if (currentFilter === 'completed') {
+                filteredTodos = todos.filter(t => t.completed);
+            }
+
+            todoList.innerHTML = filteredTodos.map(todo => `
+                <li class="todo-item ${todo.completed ? 'completed' : ''}">
+                    <input type="checkbox"
+                           ${todo.completed ? 'checked' : ''}
+                           onchange="toggleTodo(${todo.id})" />
+                    <span>${todo.text}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">×</button>
+                </li>
+            `).join('');
+        }
+
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/todos/stats');
+                const stats = await response.json();
+
+                document.getElementById('total').textContent = stats.total;
+                document.getElementById('completed').textContent = stats.completed;
+                document.getElementById('pending').textContent = stats.pending;
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+
+        document.getElementById('todoInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addTodo();
+            }
+        });
+
+        fetchTodos();
+    </script>
+</body>
+</html>
