@@ -25,12 +25,19 @@ app.get('/api/todos', (req, res) => {
 app.post('/api/todos', (req, res) => {
   const { text } = req.body;
 
-  // BUG: Missing validation for text length
-  // Security issue: No sanitization of input
+  // Input validation
+  if (!text || text.trim() === '') {
+    return res.status(400).json({ error: 'Todo text is required' });
+  }
+
+  // Length validation
+  if (text.length > 500) {
+    return res.status(400).json({ error: 'Todo text too long (max 500 characters)' });
+  }
 
   const newTodo = {
     id: nextId++,
-    text: text,  // BUG: Not trimming whitespace
+    text: text.trim(),  // Trim whitespace
     completed: false
   };
 
