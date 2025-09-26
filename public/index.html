@@ -33,9 +33,30 @@
 
         <ul id="todoList" class="todo-list" role="list" aria-label="Todo items with keyboard navigation support"></ul>
 
+        <!-- Help Modal -->
+        <div id="helpModal" class="help-modal" style="display: none;">
+            <div class="help-content">
+                <h3>Keyboard Shortcuts</h3>
+                <ul>
+                    <li><strong>Tab</strong> - Navigate between todo items</li>
+                    <li><strong>Enter / Space</strong> - Toggle todo completion</li>
+                    <li><strong>Delete / Backspace</strong> - Remove todo item</li>
+                    <li><strong>Escape</strong> - Unfocus current item / Close help</li>
+                    <li><strong>?</strong> - Show/hide this help</li>
+                </ul>
+                <p style="margin-top: 15px; font-size: 12px; color: #666;">
+                    Note: Shortcuts work when todo items are focused, not while typing in the input field.
+                </p>
+                <button onclick="toggleHelpModal()" style="margin-top: 10px;">Close</button>
+            </div>
+        </div>
+
         <div class="footer">
             <p>Try creating PRs and mentioning @claude to test the GitHub Action!</p>
-            <p style="margin-top: 10px; font-size: 12px; color: #999;">Keyboard shortcuts: Tab to navigate • Enter/Space to toggle • Delete to remove • Esc to unfocus</p>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">
+                Keyboard shortcuts: Tab to navigate • Enter/Space to toggle • Delete/Backspace to remove • Esc to unfocus
+                <span style="margin-left: 10px; opacity: 0.7;">Press ? for help</span>
+            </p>
         </div>
     </div>
 
@@ -155,10 +176,10 @@
                     aria-label="${todo.text} - ${todo.completed ? 'completed' : 'pending'} - Press Enter or Space to toggle, Delete to remove">
                     <input type="checkbox"
                            ${todo.completed ? 'checked' : ''}
-                           onchange="toggleTodo(${todo.id})"
+                           onchange="handleToggleChange(${todo.id})"
                            tabindex="-1" />
                     <span>${todo.text}</span>
-                    <button class="delete-btn" onclick="deleteTodo(${todo.id})" tabindex="-1">×</button>
+                    <button class="delete-btn" onclick="handleDeleteClick(${todo.id})" tabindex="-1">×</button>
                 </li>
             `).join('');
         }
@@ -176,50 +197,119 @@
             }
         }
 
+        // Async wrapper for toggle checkbox changes
+        async function handleToggleChange(id) {
+            try {
+                await toggleTodo(id);
+            } catch (error) {
+                console.error('Error handling toggle change:', error);
+                // Could show user notification here
+            }
+        }
+
+        // Async wrapper for delete button clicks
+        async function handleDeleteClick(id) {
+            try {
+                await deleteTodo(id);
+            } catch (error) {
+                console.error('Error handling delete click:', error);
+                // Could show user notification here
+            }
+        }
+
         // Event delegation approach to prevent memory leaks
-        function handleTodoKeydown(e) {
+        async function handleTodoKeydown(e) {
             const todoItem = e.target.closest('.todo-item');
             if (!todoItem) return;
 
+            // Prevent keyboard conflicts by checking if user is typing in input
+            if (document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
+                return;
+            }
+
             const todoId = parseInt(todoItem.dataset.id);
 
-            switch(e.key) {
-                case ' ':
-                case 'Spacebar':
-                case 'Enter':
-                    e.preventDefault();
-                    toggleTodo(todoId);
-                    break;
-                case 'Delete':
-                case 'Backspace':
-                    e.preventDefault();
-                    // Improve focus management - move to next/previous item
-                    const nextItem = todoItem.nextElementSibling || todoItem.previousElementSibling;
-                    deleteTodo(todoId).then(() => {
-                        if (nextItem) {
-                            // Find the corresponding item after re-render
-                            const newItems = document.querySelectorAll('.todo-item');
-                            if (newItems.length > 0) {
-                                const indexToFocus = Math.min(
-                                    Array.from(todoItem.parentNode.children).indexOf(todoItem),
-                                    newItems.length - 1
-                                );
-                                if (newItems[indexToFocus]) {
+            try {
+                switch(e.key) {
+                    case ' ':
+                    case 'Spacebar':
+                        // Only prevent default if not in a scrollable container context
+                        if (todoItem.getBoundingClientRect().height < window.innerHeight) {
+                            e.preventDefault();
+                        }
+                        await toggleTodo(todoId);
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        await toggleTodo(todoId);
+                        break;
+                    case 'Delete':
+                    case 'Backspace':
+                        // Prevent browser back navigation
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Store focus information before deletion
+                        const currentIndex = Array.from(todoItem.parentNode.children).indexOf(todoItem);
+                        const totalItems = todoItem.parentNode.children.length;
+
+                        const success = await deleteTodo(todoId);
+
+                        if (success) {
+                            // Improved focus management after DOM update
+                            setTimeout(() => {
+                                const newItems = document.querySelectorAll('.todo-item');
+                                if (newItems.length > 0) {
+                                    // Focus on the item that took the place of the deleted one, or the last item
+                                    const indexToFocus = Math.min(currentIndex, newItems.length - 1);
                                     newItems[indexToFocus].focus();
+                                } else {
+                                    // No items left, focus on input
+                                    document.getElementById('todoInput').focus();
                                 }
-                            }
+                            }, 50); // Small delay to ensure DOM has updated
+                        }
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        if (document.getElementById('helpModal').style.display === 'block') {
+                            toggleHelpModal();
                         } else {
-                            // No items left, focus on input
+                            todoItem.blur();
                             document.getElementById('todoInput').focus();
                         }
-                    });
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    todoItem.blur();
-                    break;
+                        break;
+                }
+            } catch (error) {
+                console.error('Error handling keyboard shortcut:', error);
+                // Could show user notification here
             }
         }
+
+        // Help modal functionality
+        function toggleHelpModal() {
+            const modal = document.getElementById('helpModal');
+            if (modal.style.display === 'none' || modal.style.display === '') {
+                modal.style.display = 'block';
+                modal.querySelector('button').focus();
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Global keyboard handler for help and other global shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Show help modal with "?" key (but not when typing in input)
+            if (e.key === '?' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                toggleHelpModal();
+            }
+            // Close help modal with Escape
+            else if (e.key === 'Escape' && document.getElementById('helpModal').style.display === 'block') {
+                e.preventDefault();
+                toggleHelpModal();
+            }
+        });
 
         // Set up event delegation for keyboard shortcuts (prevents memory leaks)
         document.getElementById('todoList').addEventListener('keydown', handleTodoKeydown);
